@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แอปพลิเคชันฐานข้อมูล</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light background color */
+            margin: 0; /* Ensure no default body margin */
+            overflow: hidden; /* Prevent body scroll when modals are open */
+        }
+        .phone-frame {
+            width: 100vw; /* Full viewport width */
+            height: 100vh; /* Full viewport height */
+            background-color: #ffffff;
+            border-radius: 0; /* No rounded corners for full screen */
+            box-shadow: none; /* No shadow for full screen */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border: none; /* No border for full screen */
+        }
+        .status-bar {
+            background-color: #ffffff;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem; /* 14px */
+            border-bottom: 1px solid #e5e7eb; /* Thin dividing line */
+            z-index: 10;
+        }
+        .content-area {
+            flex-grow: 1;
+            padding: 0;
+            overflow-y: auto; /* Make content scrollable */
+            background-color: #f9fafb; /* Content background color */
+            display: flex;
+            flex-direction: column;
+        }
+        .screen-content {
+            flex-grow: 1;
+            padding: 20px; /* Add padding back to individual screen content */
+            display: flex;
+            flex-direction: column;
+        }
+        /* Hidden class for screen management */
+        .hidden {
+            display: none;
+        }
+
+        /* Custom Modal Styles */
+        .modal-overlay {
+            position: fixed; /* Changed to fixed to cover entire viewport */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            width: 80%;
+            max-width: 300px;
+        }
+
+        /* Side Navigation Modal Specific Styles */
+        .side-nav-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: flex-start; /* Align content to the start (left) */
+            align-items: flex-start; /* Align content to the top */
+            z-index: 1000;
+            transition: transform 0.3s ease-out;
+            transform: translateX(-100%); /* Start off-screen to the left */
+        }
+
+        .side-nav-modal.active {
+            transform: translateX(0); /* Slide in */
+        }
+
+        .side-nav-content {
+            background-color: #ffffff;
+            width: 250px; /* Width of the side menu */
+            height: 100%;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .side-nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            cursor: pointer;
+            color: #374151; /* text-gray-700 */
+            font-size: 1rem;
+            border-radius: 8px;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .side-nav-item:hover {
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
+        .side-nav-item svg {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="font-semibold" id="current-time"></div>
+            <div class="flex items-center space-x-1">
+                <span id="battery-percentage">0%</span>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="content-area">
+            <!-- Login Screen Content -->
+            <div id="login-screen" class="screen-content flex-col items-center justify-center text-center">
+                <h1 class="text-3xl font-bold text-gray-800 mb-6">เข้าสู่ระบบ</h1>
+                <div class="w-3/4 max-w-xs">
+                    <input type="text" id="student-id-input" class="w-full p-3 border border-gray-300 rounded-md mb-4 text-center text-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="รหัสนักเรียน (เช่น 68219010001)">
+                    <button id="login-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg w-full transition duration-300 ease-in-out transform hover:scale-105">
+                        เข้าสู่ระบบ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Home Screen Content -->
+            <div id="home-screen" class="screen-content hidden">
+                <div class="flex items-center justify-between p-4 -mx-4 -mt-4 bg-white border-b border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800 flex-grow text-center">หน้าหลัก</h2>
+                    <button id="hamburger-menu-button" class="p-1 rounded-full hover:bg-gray-200 focus:outline-none">
+                        <svg class="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path></svg>
+                    </button>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-4 mt-4">ยินดีต้อนรับ!</h1>
+                <p class="text-gray-600 mb-6">นี่คือหน้าจอแรกของแอปพลิเคชันของคุณ</p>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Sample Application Card - Database -->
+                    <div class="bg-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center text-center cursor-pointer" id="database-app-icon">
+                        <!-- Database Icon SVG -->
+                        <svg class="w-10 h-10 text-blue-500 mb-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15.5V17c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-1.5c0-.83.67-1.5 1.5-1.5h15c.83 0 1.5.67 1.5 1.5zm-1.5-6c0 .83-.67 1.5-1.5 1.5H4.5c-.83 0-1.5-.67-1.5-1.5V8c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v1.5zm-1.5-6c0 .83-.67 1.5-1.5 1.5H4.5c-.83 0-1.5-.67-1.5-1.5V3c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v1.5z"/>
+                        </svg>
+                        <p class="text-sm font-medium text-gray-700">ฐานข้อมูล</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center text-center">
+                        <svg class="w-10 h-10 text-green-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                        <p class="text-sm font-medium text-gray-700">ข้อความ</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center text-center">
+                        <svg class="w-10 h-10 text-red-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2M18 6l2 2m-2-2L8.243 14.757M14.757 8.243L5.243 17.757M14.757 8.243a3 3 0 11-4.243-4.243m4.243 4.243a3 3 0 10-4.243 4.243"></path></svg>
+                        <p class="text-sm font-medium text-gray-700">การตั้งค่า</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center text-center">
+                        <svg class="w-10 h-10 text-purple-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <p class="text-sm font-medium text-gray-700">วิดีโอ</p>
+                    </div>
+                </div>
+
+                <div class="mt-8 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-lg">
+                    <p class="font-semibold">ข้อเสนอแนะ:</p>
+                    <p>คุณสามารถเพิ่มเนื้อหาหรือแอปพลิเคชันเพิ่มเติมในพื้นที่นี้ได้</p>
+                </div>
+            </div>
+
+            <!-- Database Options Screen (Choose Create/Do Not Create) -->
+            <div id="database-options-screen" class="hidden screen-content flex-col items-center justify-center text-center">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">จัดการฐานข้อมูล</h2>
+                <button id="create-db-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg mb-4 w-3/4 transition duration-300 ease-in-out transform hover:scale-105">
+                    สร้างฐานข้อมูล
+                </button>
+                <button id="cancel-db-button" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-xl shadow-lg w-3/4 transition duration-300 ease-in-out transform hover:scale-105">
+                    ไม่สร้าง
+                </button>
+            </div>
+
+            <!-- Database Creation Options Screen (Upload, Folder, File) -->
+            <div id="database-creation-options-screen" class="hidden screen-content flex-col items-center justify-center text-center">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">เลือกประเภทการสร้าง</h2>
+                <button id="upload-file-option" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg mb-4 w-3/4 transition duration-300 ease-in-out transform hover:scale-105">
+                    อัพโหลดไฟล์
+                </button>
+                <button id="create-folder-option" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg mb-4 w-3/4 transition duration-300 ease-in-out transform hover:scale-105">
+                    สร้างโฟลเดอร์
+                </button>
+                <button id="create-new-file-option" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg mb-4 w-3/4 transition duration-300 ease-in-out transform hover:scale-105">
+                    สร้างไฟล์
+                </button>
+                <button id="back-from-creation-options" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-xl shadow-lg w-3/4 transition duration-300 ease-in-out transform hover:scale-105">
+                    ย้อนกลับ
+                </button>
+            </div>
+
+            <!-- My Database Screen -->
+            <div id="my-database-screen" class="hidden flex flex-col h-full">
+                <div class="flex items-center justify-between p-4 bg-white border-b border-gray-200">
+                    <button id="back-from-my-db" class="text-gray-600 hover:text-gray-800">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <h2 class="text-xl font-bold text-gray-800 flex-grow text-center">ฐานข้อมูลของฉัน</h2>
+                    <!-- Header Three Dots Button (for paste/search) -->
+                    <button id="header-three-dots-button" class="p-1 rounded-full hover:bg-gray-200 focus:outline-none">
+                        <svg class="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"></path></svg>
+                    </button>
+                </div>
+                <!-- Breadcrumbs -->
+                <div id="breadcrumbs" class="p-2 bg-gray-100 border-b border-gray-200 text-sm text-gray-600 overflow-x-auto whitespace-nowrap">
+                    <!-- Breadcrumb path will be rendered here -->
+                </div>
+                <div class="flex-grow p-4 overflow-y-auto">
+                    <p class="text-gray-600 mb-4">ไฟล์ที่เก็บไว้ในฐานข้อมูล:</p>
+                    <ul id="file-list" class="space-y-2">
+                        <!-- Files and folders will be dynamically added here -->
+                    </ul>
+                    <p id="no-files-message" class="text-gray-500 text-center mt-8">ยังไม่มีไฟล์ในฐานข้อมูล</p>
+                </div>
+                <div class="p-4 flex justify-center">
+                    <button id="add-file-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold p-4 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Editor Screen -->
+            <div id="file-editor-screen" class="hidden flex flex-col h-full">
+                <div class="flex items-center justify-between p-4 bg-white border-b border-gray-200">
+                    <button id="back-from-file-editor" class="text-gray-600 hover:text-gray-800">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <h2 id="file-editor-title" class="text-xl font-bold text-gray-800 flex-grow text-center"></h2>
+                    <div class="w-6 h-6"></div> <!-- Placeholder for alignment -->
+                </div>
+                <div class="flex-grow p-4">
+                    <textarea id="file-content-textarea" class="w-full h-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                </div>
+                <div class="p-4 flex justify-end">
+                    <button id="save-file-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+                        บันทึก
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Hidden file input for uploading -->
+        <input type="file" id="file-input" class="hidden" webkitdirectory directory>
+
+        <!-- Custom Input Modal -->
+        <div id="input-modal" class="hidden modal-overlay">
+            <div class="modal-content">
+                <h3 id="input-modal-title" class="text-lg font-semibold mb-4"></h3>
+                <input type="text" id="input-modal-field" class="w-full p-2 border border-gray-300 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="">
+                <div class="flex justify-end space-x-2">
+                    <button id="input-modal-cancel" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg rounded-md">ยกเลิก</button>
+                    <button id="input-modal-confirm" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg rounded-md">ตกลง</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Message Modal (for alerts) -->
+        <div id="message-modal" class="hidden modal-overlay">
+            <div class="modal-content">
+                <h3 id="message-modal-title" class="text-lg font-semibold mb-4"></h3>
+                <p id="message-modal-text" class="mb-4"></p>
+                <div class="flex justify-end space-x-2">
+                    <button id="message-modal-ok" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg rounded-md">ตกลง</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Item Options Modal -->
+        <div id="item-options-modal" class="hidden modal-overlay">
+            <div class="modal-content">
+                <h3 class="text-lg font-semibold mb-4">ตัวเลือกรายการ</h3>
+                <div class="flex flex-col space-y-2">
+                    <button id="modal-option-delete" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg rounded-md">ลบ</button>
+                    <button id="modal-option-copy" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg rounded-md">คัดลอก</button>
+                    <button id="modal-option-cut" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg rounded-md">ตัด</button>
+                    <button id="modal-option-cancel" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg rounded-md">ยกเลิก</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header Options Modal -->
+        <div id="header-options-modal" class="hidden modal-overlay">
+            <div class="modal-content">
+                <h3 class="text-lg font-semibold mb-4">ตัวเลือกเพิ่มเติม</h3>
+                <div class="flex flex-col space-y-2">
+                    <button id="header-option-paste" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg rounded-md hidden">วาง</button>
+                    <button id="header-option-search" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg rounded-md">ค้นหา</button>
+                    <button id="header-option-cancel" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg rounded-md">ยกเลิก</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Results Modal -->
+        <div id="search-results-modal" class="hidden modal-overlay">
+            <div class="modal-content">
+                <h3 class="text-lg font-semibold mb-4">ผลการค้นหา</h3>
+                <ul id="search-results-list" class="space-y-2 mb-4">
+                    <!-- Search results will be dynamically added here -->
+                </ul>
+                <p id="no-search-results-message" class="text-gray-500 text-center hidden">ไม่พบผลลัพธ์</p>
+                <div class="flex justify-end">
+                    <button id="search-results-ok" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg rounded-md">ตกลง</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Side Navigation Modal -->
+        <div id="side-nav-modal" class="hidden side-nav-modal">
+            <div class="side-nav-content">
+                <h3 class="text-xl font-bold text-gray-800 mb-6">เมนู</h3>
+                <div class="flex flex-col space-y-2">
+                    <div class="side-nav-item" id="side-nav-db-icon">
+                        <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15.5V17c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-1.5c0-.83.67-1.5 1.5-1.5h15c.83 0 1.5.67 1.5 1.5zm-1.5-6c0 .83-.67 1.5-1.5 1.5H4.5c-.83 0-1.5-.67-1.5-1.5V8c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v1.5zm-1.5-6c0 .83-.67 1.5-1.5 1.5H4.5c-.83 0-1.5-.67-1.5-1.5V3c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v1.5z"/>
+                        </svg>
+                        <span>ฐานข้อมูล</span>
+                    </div>
+                    <div class="side-nav-item" id="side-nav-profile">
+                        <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+                        <span>โปรไฟล์</span>
+                    </div>
+                    <div class="side-nav-item" id="side-nav-add">
+                        <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path></svg>
+                        <span>เพิ่ม</span>
+                    </div>
+                    <div class="side-nav-item" id="side-nav-apps">
+                        <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M7 3a1 1 0 00-1 1v1a1 1 0 002 0V4a1 1 0 00-1-1zm0 5a1 1 0 00-1 1v1a1 1 0 002 0V9a1 1 0 00-1-1zm10-5a1 1 0 00-1 1v1a1 1 0 002 0V4a1 1 0 00-1-1zM7 13a1 1 0 00-1 1v1a1 1 0 002 0v-1a1 1 0 00-1-1zm10 0a1 1 0 00-1 1v1a1 1 0 002 0v-1a1 1 0 00-1-1zM12 3a1 1 0 00-1 1v1a1 1 0 002 0V4a1 1 0 00-1-1zm0 5a1 1 0 00-1 1v1a1 1 0 002 0V9a1 1 0 00-1-1zm0 5a1 1 0 00-1 1v1a1 1 0 002 0v-1a1 1 0 00-1-1zM9 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zm0 5a1 1 0 00-1 1v1a1 1 0 002 0V8a1 1 0 00-1-1zm0 5a1 1 0 00-1 1v1a1 1 0 002 0v-1a1 1 0 00-1-1z"></path></svg>
+                        <span>แอป</span>
+                    </div>
+                    <div class="side-nav-item" id="side-nav-logout">
+                        <svg class="w-6 h-6 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        <span>ออกจากระบบ</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+<script type="module">
+    // Firebase Imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Global Firebase variables
+    let app;
+    let db;
+    let auth;
+    let loggedInUserId = null; // Stores the current student ID as the user ID
+
+    // Firebase configuration and app ID from the environment
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+    // Initialize Firebase (only once)
+    if (Object.keys(firebaseConfig).length > 0 && !app) {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        // Listen for auth state changes
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in.
+                loggedInUserId = user.uid;
+                console.log("Firebase: User signed in with UID:", loggedInUserId);
+                // No automatic screen change here, it's handled by loginUser
+            } else {
+                // User is signed out.
+                loggedInUserId = null;
+                console.log("Firebase: User signed out.");
+                showScreen('login-screen'); // Go back to login screen on logout
+            }
+        });
+    } else if (!app) {
+        console.error("Firebase config not found. Running without Firebase persistence.");
+        // Fallback for development without Canvas environment
+        // For actual Canvas deployment, __firebase_config will be provided.
+    }
+
+    // Represents the entire file system in memory
+    let fileSystem = {
+        name: "Root", // Internal name for the root of our file system
+        type: "folder",
+        children: []
+    };
+
+    // Reference to the current folder object being viewed
+    let currentFolder = fileSystem;
+    // Array of strings for breadcrumbs display
+    let pathSegments = ["ฐานข้อมูลของฉัน"];
+    // Flag to indicate if the database has been "created" (i.e., user chose to create it)
+    let isDatabaseCreated = false; // This flag will now be managed by Firestore data presence
+    // Variable to hold the currently opened file object for editing
+    let currentEditingFile = null;
+    // Variable to store the item (file/folder) that was selected for options
+    let selectedItemForOptions = null;
+    // Global clipboard for copy/cut/paste
+    let clipboard = { itemReference: null, isCut: false };
+
+    // Function to update the current time in the status bar
+    function updateTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('current-time').textContent = `${hours}:${minutes}`;
+    }
+
+    // Function to show a specific screen and hide others
+    function showScreen(screenId) {
+        const screens = ['login-screen', 'home-screen', 'database-options-screen', 'database-creation-options-screen', 'my-database-screen', 'file-editor-screen'];
+        screens.forEach(id => {
+            const screen = document.getElementById(id);
+            if (screen) {
+                screen.classList.add('hidden');
+            }
+        });
+        const targetScreen = document.getElementById(screenId);
+        if (targetScreen) {
+            targetScreen.classList.remove('hidden');
+        }
+        hideItemOptionsModal(); // Always hide item options modal when changing screens
+        hideHeaderOptionsModal(); // Always hide header options modal when changing screens
+        hideSearchResultsModal(); // Always hide search results modal when changing screens
+        hideSideNavModal(); // Always hide side nav modal when changing screens
+        updatePasteButtonVisibility(); // Update paste button visibility when screen changes
+    }
+
+    // Function to render files and folders in the current directory
+    function renderFiles() {
+        const fileList = document.getElementById('file-list');
+        const noFilesMessage = document.getElementById('no-files-message');
+        fileList.innerHTML = ''; // Clear existing list
+
+        // Sort children: folders first, then files, both alphabetically
+        const sortedChildren = [...currentFolder.children].sort((a, b) => {
+            if (a.type === 'folder' && b.type !== 'folder') return -1;
+            if (a.type !== 'folder' && b.type === 'folder') return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        if (sortedChildren.length === 0) {
+            noFilesMessage.classList.remove('hidden');
+        } else {
+            noFilesMessage.classList.add('hidden');
+            sortedChildren.forEach(item => {
+                const listItem = document.createElement('li');
+                listItem.className = 'flex items-center justify-between bg-white p-3 rounded-lg shadow-sm';
+
+                const itemContentDiv = document.createElement('div');
+                itemContentDiv.className = 'flex items-center cursor-pointer flex-grow'; // flex-grow to take available space
+                itemContentDiv.setAttribute('data-type', item.type);
+                itemContentDiv.setAttribute('data-name', item.name);
+
+                if (item.type === 'folder') {
+                    itemContentDiv.innerHTML = `
+                        <svg class="w-5 h-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.09.9 2 2 2h16c1.09 0 2-.91 2-2V8c0-1.09-.91-2-2-2h-8l-2-2z"/></svg>
+                        <span class="text-gray-800">${item.name}</span>
+                    `;
+                    // Add event listener for folder click
+                    itemContentDiv.addEventListener('click', () => {
+                        navigateToFolder(item.name);
+                    });
+                } else { // type is 'file'
+                    itemContentDiv.innerHTML = `
+                        <svg class="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                        <span class="text-gray-800">${item.name}</span>
+                    `;
+                    // Add event listener for file click
+                    itemContentDiv.addEventListener('click', () => {
+                        openFileForEditing(item.name);
+                    });
+                }
+
+                listItem.appendChild(itemContentDiv);
+
+                // Add three-dot menu button
+                const threeDotsButton = document.createElement('button');
+                threeDotsButton.className = 'three-dots-menu-button p-1 rounded-full hover:bg-gray-200 focus:outline-none';
+                threeDotsButton.innerHTML = `
+                    <svg class="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"></path></svg>
+                `;
+                threeDotsButton.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent click from bubbling up to listItem
+                    selectedItemForOptions = item; // Store the item for modal actions
+                    showItemOptionsModal();
+                });
+                listItem.appendChild(threeDotsButton);
+
+                fileList.appendChild(listItem);
+            });
+        }
+        renderBreadcrumbs(); // Always re-render breadcrumbs when files are rendered
+        updatePasteButtonVisibility(); // Update paste button visibility
+    }
+
+    // Function to render the breadcrumbs path
+    function renderBreadcrumbs() {
+        const breadcrumbsDiv = document.getElementById('breadcrumbs');
+        breadcrumbsDiv.innerHTML = '';
+        pathSegments.forEach((segment, index) => {
+            const span = document.createElement('span');
+            span.className = 'text-gray-600';
+            span.textContent = segment;
+            if (index < pathSegments.length - 1) {
+                const arrow = document.createElement('span');
+                arrow.className = 'mx-1 text-gray-400';
+                arrow.textContent = '>';
+                breadcrumbsDiv.appendChild(span);
+                breadcrumbsDiv.appendChild(arrow);
+            } else {
+                span.className += ' font-semibold text-gray-800'; // Current folder is bold
+                breadcrumbsDiv.appendChild(span);
+            }
+        });
+    }
+
+    // Function to navigate into a specific folder
+    function navigateToFolder(folderName) {
+        const targetFolder = currentFolder.children.find(item => item.type === 'folder' && item.name === folderName);
+        if (targetFolder) {
+            currentFolder = targetFolder;
+            pathSegments.push(folderName);
+            renderFiles(); // Re-render content of the new folder
+        }
+    }
+
+    // Function to navigate back up the folder hierarchy
+    function navigateBack() {
+        if (pathSegments.length > 1) { // If not at the root level
+            pathSegments.pop(); // Remove current folder from path
+            // Re-find currentFolder by traversing from the root
+            currentFolder = fileSystem;
+            for (let i = 1; i < pathSegments.length; i++) {
+                const segmentName = pathSegments[i];
+                const nextFolder = currentFolder.children.find(item => item.type === 'folder' && item.name === segmentName);
+                if (nextFolder) {
+                    currentFolder = nextFolder;
+                } else {
+                    // This should ideally not happen if pathSegments is consistent
+                    console.error("Error: Could not find folder during back navigation.");
+                    currentFolder = fileSystem; // Fallback to root
+                    pathSegments = ["ฐานข้อมูลของฉัน"];
+                    break;
+                }
+            }
+            renderFiles(); // Re-render content of the parent folder
+        } else {
+            // If at the root, go back to home screen
+            showScreen('home-screen');
+            // Reset current folder and path segments when returning to home
+            currentFolder = fileSystem;
+            pathSegments = ["ฐานข้อมูลของฉัน"];
+        }
+    }
+
+    // Function to open a file for editing
+    function openFileForEditing(fileName) {
+        currentEditingFile = currentFolder.children.find(item => item.type === 'file' && item.name === fileName);
+        if (currentEditingFile) {
+            document.getElementById('file-editor-title').textContent = currentEditingFile.name;
+            document.getElementById('file-content-textarea').value = currentEditingFile.content || ''; // Display current content or empty string
+            showScreen('file-editor-screen');
+        }
+    }
+
+    // Custom Input Modal Logic
+    function showInputModal(title, placeholder, callback) {
+        const modal = document.getElementById('input-modal');
+        const modalTitle = document.getElementById('input-modal-title');
+        const modalField = document.getElementById('input-modal-field');
+        const modalConfirm = document.getElementById('input-modal-confirm');
+        const modalCancel = document.getElementById('input-modal-cancel');
+
+        modalTitle.textContent = title;
+        modalField.value = '';
+        modalField.placeholder = placeholder;
+        modal.classList.remove('hidden');
+        modalField.focus(); // Focus on the input field
+
+        // Event listeners for modal buttons
+        const confirmHandler = () => {
+            modal.classList.add('hidden');
+            callback(modalField.value);
+            // Clean up listeners to prevent multiple calls
+            modalConfirm.removeEventListener('click', confirmHandler);
+            modalCancel.removeEventListener('click', cancelHandler);
+        };
+
+        const cancelHandler = () => {
+            modal.classList.add('hidden');
+            callback(null); // Indicate cancellation
+            // Clean up listeners
+            modalConfirm.removeEventListener('click', confirmHandler);
+            modalCancel.removeEventListener('click', cancelHandler);
+        };
+
+        modalConfirm.addEventListener('click', confirmHandler);
+        modalCancel.addEventListener('click', cancelHandler);
+    }
+
+    // Custom Message Modal Logic (replaces alert())
+    function showMessageModal(title, message) {
+        const modal = document.getElementById('message-modal');
+        const modalTitle = document.getElementById('message-modal-title');
+        const modalText = document.getElementById('message-modal-text');
+        const modalOk = document.getElementById('message-modal-ok');
+
+        modalTitle.textContent = title;
+        modalText.textContent = message;
+        modal.classList.remove('hidden');
+
+        const okHandler = () => {
+            modal.classList.add('hidden');
+            modalOk.removeEventListener('click', okHandler);
+        };
+        modalOk.addEventListener('click', okHandler);
+    }
+
+    // --- Item Options Modal Functions ---
+    function showItemOptionsModal() {
+        const modal = document.getElementById('item-options-modal');
+        modal.classList.remove('hidden');
+    }
+
+    function hideItemOptionsModal() {
+        document.getElementById('item-options-modal').classList.add('hidden');
+        selectedItemForOptions = null; // Clear the selected item
+    }
+
+    // --- Header Options Modal Functions ---
+    function showHeaderOptionsModal() {
+        const modal = document.getElementById('header-options-modal');
+        const pasteOption = document.getElementById('header-option-paste');
+
+        if (clipboard.itemReference) {
+            pasteOption.classList.remove('hidden');
+        } else {
+            pasteOption.classList.add('hidden');
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function hideHeaderOptionsModal() {
+        document.getElementById('header-options-modal').classList.add('hidden');
+    }
+
+    // --- Search Results Modal Functions ---
+    function showSearchResultsModal(results) {
+        const modal = document.getElementById('search-results-modal');
+        const resultsList = document.getElementById('search-results-list');
+        const noResultsMessage = document.getElementById('no-search-results-message');
+
+        resultsList.innerHTML = ''; // Clear previous results
+
+        if (results.length === 0) {
+            noResultsMessage.classList.remove('hidden');
+        } else {
+            noResultsMessage.classList.add('hidden');
+            results.forEach(resultObj => {
+                const item = resultObj.item;
+                const itemPath = resultObj.path; // The full path to the item from root (e.g., ["FolderA", "File1"])
+
+                const listItem = document.createElement('li');
+                listItem.className = 'flex items-center bg-gray-100 p-2 rounded-md cursor-pointer';
+                listItem.innerHTML = `
+                    <svg class="w-4 h-4 mr-2 ${item.type === 'folder' ? 'text-yellow-500' : 'text-gray-400'}" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        ${item.type === 'folder' ? '<path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.09.9 2 2 2h16c1.09 0 2-.91 2-2V8c0-1.09-.91-2-2-2h-8l-2-2z"/>' : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>'}
+                    </svg>
+                    <span>${item.name}</span>
+                    <span class="text-xs text-gray-500 ml-2">(${itemPath.join(' > ')})</span> <!-- Display path -->
+                `;
+                listItem.addEventListener('click', () => {
+                    hideSearchResultsModal(); // Hide search results modal immediately
+
+                    // Find the actual folder object to navigate to
+                    let targetFolderObject = fileSystem; // Start from the actual root object
+
+                    // Determine the path segments to traverse to reach the parent folder (for files) or the folder itself (for folders)
+                    const segmentsToTraverse = item.type === 'file' ? itemPath.slice(0, -1) : itemPath;
+
+                    // Traverse the file system to the target folder
+                    for (const segmentName of segmentsToTraverse) {
+                        const nextItem = targetFolderObject.children.find(child => child.name === segmentName);
+                        if (nextItem && nextItem.type === 'folder') {
+                            targetFolderObject = nextItem;
+                        } else {
+                            console.error("Error: Could not navigate to path segment during search result click:", segmentName);
+                            showMessageModal('ข้อผิดพลาด', `ไม่สามารถไปยังตำแหน่งไฟล์ได้: โฟลเดอร์ '${segmentName}' ไม่พบ`);
+                            renderFiles(); // Stay on current screen or go to root
+                            return;
+                        }
+                    }
+
+                    // Set currentFolder to the target folder and update breadcrumbs
+                    currentFolder = targetFolderObject;
+                    // The pathSegments for breadcrumbs should reflect the actual path from the "ฐานข้อมูลของฉัน" root,
+                    // which corresponds to `fileSystem`'s children.
+                    pathSegments = ["ฐานข้อมูลของฉัน", ...segmentsToTraverse];
+
+                    renderFiles(); // Re-render the content of the new current folder
+
+                    // If the original clicked item was a file, open it for editing after navigating to its folder
+                    if (item.type === 'file') {
+                        openFileForEditing(item.name);
+                    }
+                });
+                resultsList.appendChild(listItem);
+            });
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function hideSearchResultsModal() {
+        document.getElementById('search-results-modal').classList.add('hidden');
+    }
+
+    // --- Side Navigation Modal Functions ---
+    function showSideNavModal() {
+        const modal = document.getElementById('side-nav-modal');
+        modal.classList.remove('hidden');
+        // Use a timeout to allow the 'hidden' class to be removed before applying 'active' for transition
+        setTimeout(() => {
+            modal.classList.add('active');
+        }, 10);
+    }
+
+    function hideSideNavModal() {
+        const modal = document.getElementById('side-nav-modal');
+        modal.classList.remove('active');
+        // Use a timeout to allow the transition to complete before adding 'hidden'
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300); // Match CSS transition duration
+    }
+
+
+    // Recursive search function that returns exact match or similar matches with their full paths
+    // pathPrefix: The path from the root of the fileSystem to the current 'folder' being searched.
+    function searchFilesRecursively(query, folder, pathPrefix = []) {
+        let foundExactMatch = null;
+        let foundSimilarMatches = [];
+        const lowerCaseQuery = query.toLowerCase();
+
+        for (const item of folder.children) {
+            const itemLowerCaseName = item.name.toLowerCase();
+            const itemFullPath = [...pathPrefix, item.name]; // Path including the item itself
+
+            if (itemLowerCaseName === lowerCaseQuery) {
+                foundExactMatch = { item: item, path: itemFullPath };
+                // If exact match found, we prioritize it and stop.
+                // No need to continue searching for similar matches if an exact match is found.
+                return { exactMatch: foundExactMatch, similarMatches: [] };
+            } else if (itemLowerCaseName.includes(lowerCaseQuery)) {
+                foundSimilarMatches.push({ item: item, path: itemFullPath });
+            }
+
+            // If it's a folder, recurse into it
+            if (item.type === 'folder' && item.children) {
+                const nestedResults = searchFilesRecursively(query, item, itemFullPath); // Pass itemFullPath as pathPrefix for next level
+                if (nestedResults.exactMatch) {
+                    foundExactMatch = nestedResults.exactMatch;
+                    // If exact match found in nested, propagate it up and stop
+                    return { exactMatch: foundExactMatch, similarMatches: [] };
+                }
+                foundSimilarMatches = foundSimilarMatches.concat(nestedResults.similarMatches);
+            }
+        }
+
+        return { exactMatch: foundExactMatch, similarMatches: foundSimilarMatches };
+    }
+
+
+    // --- Core File System Operations ---
+    async function saveFileSystem() {
+        if (!db || !loggedInUserId) {
+            console.warn("Firestore not initialized or user not logged in. Cannot save file system.");
+            return;
+        }
+        try {
+            const docRef = doc(db, `artifacts/${appId}/users/${loggedInUserId}/fileSystems`, "mainFileSystem");
+            await setDoc(docRef, { data: JSON.stringify(fileSystem) }, { merge: true });
+            console.log("File system saved to Firestore for user:", loggedInUserId);
+        } catch (e) {
+            console.error("Error saving file system to Firestore:", e);
+            showMessageModal('ข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้');
+        }
+    }
+
+    async function loadFileSystem() {
+        if (!db || !loggedInUserId) {
+            console.warn("Firestore not initialized or user not logged in. Cannot load file system.");
+            return;
+        }
+        try {
+            const docRef = doc(db, `artifacts/${appId}/users/${loggedInUserId}/fileSystems`, "mainFileSystem");
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                const loadedData = JSON.parse(docSnap.data().data);
+                fileSystem = loadedData;
+                currentFolder = fileSystem; // Reset current folder to the loaded root
+                pathSegments = ["ฐานข้อมูลของฉัน"]; // Reset breadcrumbs
+                isDatabaseCreated = true;
+                console.log("File system loaded from Firestore for user:", loggedInUserId);
+            } else {
+                console.log("No existing file system found for user. Initializing new one.");
+                fileSystem = { name: "Root", type: "folder", children: [] };
+                currentFolder = fileSystem;
+                pathSegments = ["ฐานข้อมูลของฉัน"];
+                isDatabaseCreated = false; // Set to false, user will be prompted to create
+                await saveFileSystem(); // Save the empty initial state
+            }
+            renderFiles(); // Render files after loading
+        } catch (e) {
+            console.error("Error loading file system from Firestore:", e);
+            showMessageModal('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้');
+            // Fallback to empty file system on error
+            fileSystem = { name: "Root", type: "folder", children: [] };
+            currentFolder = fileSystem;
+            pathSegments = ["ฐานข้อมูลของฉัน"];
+            isDatabaseCreated = false;
+            renderFiles();
+        }
+    }
+
+    function deleteItem() {
+        if (selectedItemForOptions) {
+            showInputModal('ยืนยันการลบ', `คุณแน่ใจหรือไม่ว่าต้องการลบ '${selectedItemForOptions.name}'? (พิมพ์ "ยืนยัน" เพื่อลบ)`, async (confirmation) => {
+                if (confirmation && confirmation.toLowerCase() === 'ยืนยัน') {
+                    const index = currentFolder.children.indexOf(selectedItemForOptions);
+                    if (index > -1) {
+                        currentFolder.children.splice(index, 1); // Remove item from array
+                        renderFiles(); // Re-render the list
+                        await saveFileSystem(); // Save changes to Firestore
+                        showMessageModal('ลบสำเร็จ', `'${selectedItemForOptions.name}' ถูกลบแล้ว`);
+                    }
+                } else if (confirmation !== null) {
+                    showMessageModal('ยกเลิก', 'การลบถูกยกเลิก');
+                }
+            });
+        }
+        hideItemOptionsModal();
+    }
+
+    function copyItem() {
+        if (selectedItemForOptions) {
+            clipboard.itemReference = JSON.parse(JSON.stringify(selectedItemForOptions));
+            clipboard.isCut = false;
+            showMessageModal('คัดลอกสำเร็จ', `'${selectedItemForOptions.name}' ถูกคัดลอกแล้ว!`);
+        }
+        hideItemOptionsModal();
+        updatePasteButtonVisibility();
+    }
+
+    function cutItem() {
+        if (selectedItemForOptions) {
+            clipboard.itemReference = selectedItemForOptions;
+            clipboard.isCut = true;
+
+            const index = currentFolder.children.indexOf(selectedItemForOptions);
+            if (index > -1) {
+                currentFolder.children.splice(index, 1);
+                renderFiles();
+                saveFileSystem(); // Save changes to Firestore immediately after cut
+            }
+            showMessageModal('ตัดสำเร็จ', `'${selectedItemForOptions.name}' ถูกตัดแล้ว!`);
+        }
+        hideItemOptionsModal();
+        updatePasteButtonVisibility();
+    }
+
+    async function pasteItem() {
+        if (!clipboard.itemReference) {
+            showMessageModal('ข้อผิดพลาด', 'ไม่มีรายการที่ถูกคัดลอกหรือตัด');
+            return;
+        }
+
+        let itemToPaste = clipboard.itemReference;
+        const isCutOperation = clipboard.isCut;
+
+        if (itemToPaste.type === 'folder' && currentFolder === itemToPaste) {
+            showMessageModal('ข้อผิดพลาด', 'ไม่สามารถวางโฟลเดอร์ในตำแหน่งเดิมได้');
+            return;
+        }
+
+        const existingItem = currentFolder.children.find(
+            child => child.name === itemToPaste.name && child.type === itemToPaste.type
+        );
+
+        if (existingItem) {
+            if (isCutOperation && existingItem === itemToPaste) {
+                showMessageModal('ข้อผิดพลาด', 'ไม่สามารถตัดและวางในโฟลเดอร์เดียวกันได้');
+                return;
+            } else {
+                showMessageModal('ข้อผิดพลาด', `ไฟล์/โฟลเดอร์ชื่อ '${itemToPaste.name}' มีอยู่แล้วในโฟลเดอร์นี้`);
+                return;
+            }
+        }
+
+        if (!isCutOperation) {
+            itemToPaste = JSON.parse(JSON.stringify(clipboard.itemReference));
+        }
+
+        currentFolder.children.push(itemToPaste);
+
+        clipboard = { itemReference: null, isCut: false }; // Clear clipboard after paste
+        renderFiles();
+        await saveFileSystem(); // Save changes to Firestore
+        showScreen('my-database-screen');
+        showMessageModal('วางสำเร็จ', `'${itemToPaste.name}' ถูกวางแล้ว!`);
+        updatePasteButtonVisibility();
+        hideHeaderOptionsModal(); // Close header options modal after paste
+    }
+
+    // Function to update the visibility of the paste button inside the header options modal
+    function updatePasteButtonVisibility() {
+        const headerOptionPaste = document.getElementById('header-option-paste');
+        if (headerOptionPaste) {
+            if (clipboard.itemReference) {
+                headerOptionPaste.classList.remove('hidden');
+            } else {
+                headerOptionPaste.classList.add('hidden');
+            }
+        }
+    }
+
+    // Function to handle search
+    function performSearch() {
+        hideHeaderOptionsModal(); // Close header options modal immediately
+
+        showInputModal('ค้นหาไฟล์/โฟลเดอร์', 'ชื่อที่ต้องการค้นหา', (query) => {
+            if (query && query.trim() !== '') {
+                const trimmedQuery = query.trim();
+                // Start search from the root of the file system
+                const searchResults = searchFilesRecursively(trimmedQuery, fileSystem);
+                let resultsToDisplay = [];
+
+                if (searchResults.exactMatch) {
+                    resultsToDisplay.push(searchResults.exactMatch); // Only exact match
+                } else {
+                    resultsToDisplay = searchResults.similarMatches; // All similar matches
+                }
+                showSearchResultsModal(resultsToDisplay);
+            } else if (query !== null) {
+                showMessageModal('ข้อผิดพลาด', 'โปรดระบุคำค้นหา');
+            }
+        });
+    }
+
+    // Function to add an uploaded file (or folder structure) to the in-memory file system
+    async function addUploadedFileOrFolderToSystem(file, rootFolder) {
+        // webkitRelativePath will be like "folderName/subfolder/fileName.txt"
+        const pathParts = file.webkitRelativePath.split('/').filter(part => part !== ''); // Filter out empty strings
+        const fileName = pathParts.pop(); // Last part is the file name
+
+        let currentDir = rootFolder;
+        // Traverse or create folders in the path
+        for (const folderName of pathParts) {
+            let nextFolder = currentDir.children.find(child => child.name === folderName && child.type === 'folder');
+            if (!nextFolder) {
+                nextFolder = { name: folderName, type: "folder", children: [] };
+                currentDir.children.push(nextFolder);
+            }
+            currentDir = nextFolder;
+        }
+
+        // Check for existing file/folder with the same name in the target directory
+        const exists = currentDir.children.some(item => item.name === fileName && item.type === 'file');
+        if (exists) {
+            showMessageModal('ข้อผิดพลาด', `ไฟล์ชื่อ '${fileName}' มีอยู่แล้วในโฟลเดอร์ '${currentDir.name}'`);
+            return; // Skip adding this file
+        }
+
+        // Read file content if it's a file
+        // Check common text file types or if it has no specific type (might be text)
+        if (file.type.startsWith('text/') || file.type === '' || file.name.includes('.txt') || file.name.includes('.js') || file.name.includes('.css') || file.name.includes('.html') || file.name.includes('.json') || file.name.includes('.xml')) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                currentDir.children.push({ name: fileName, type: "file", content: e.target.result });
+                renderFiles(); // Re-render after file content is loaded
+                await saveFileSystem(); // Save changes to Firestore
+            };
+            reader.onerror = (e) => {
+                console.error("Error reading file:", e);
+                currentDir.children.push({ name: fileName, type: "file", content: "Error loading content." });
+                renderFiles(); // Re-render even on error
+                saveFileSystem(); // Try to save even on error
+            };
+            reader.readAsText(file);
+        } else {
+            // For non-text files, store a placeholder content
+            currentDir.children.push({ name: fileName, type: "file", content: `[Binary content for ${file.type || 'unknown type'}]` });
+            renderFiles(); // Re-render immediately for non-text files
+            await saveFileSystem(); // Save changes to Firestore
+        }
+    }
+
+    // Function to handle user login
+    async function loginUser(studentId) {
+        const regex = /^682190100(0[1-9]|1[0-5])$/;
+        if (!regex.test(studentId)) {
+            showMessageModal('ข้อผิดพลาด', 'รหัสนักเรียนไม่ถูกต้อง กรุณาป้อนในรูปแบบ 682190100xx โดยที่ xx คือ 01-15');
+            return;
+        }
+
+        try {
+            // Use the studentId as the UID for custom token authentication
+            // In a real app, you'd generate a custom token on your backend.
+            // For this simulation, we'll use a placeholder token if __initial_auth_token is not available.
+            // The key here is that the UID for Firestore is the studentId.
+            if (typeof __initial_auth_token !== 'undefined') {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                // Fallback for local testing, sign in anonymously if no custom token
+                await auth.signInAnonymously();
+            }
+            loggedInUserId = studentId; // Set the loggedInUserId to the studentId for data separation
+
+            await loadFileSystem(); // Load data for this student ID
+            showScreen('home-screen'); // Go to home screen after successful login and data load
+            showMessageModal('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับ ${studentId}!`);
+        } catch (error) {
+            console.error("Error during login:", error);
+            showMessageModal('ข้อผิดพลาด', `การเข้าสู่ระบบล้มเหลว: ${error.message}`);
+        }
+    }
+
+    // Function to handle user logout
+    async function logoutUser() {
+        try {
+            await signOut(auth);
+            showMessageModal('ออกจากระบบ', 'คุณออกจากระบบแล้ว');
+            // onAuthStateChanged listener will handle showing login-screen
+        } catch (error) {
+            console.error("Error during logout:", error);
+            showMessageModal('ข้อผิดพลาด', `การออกจากระบบล้มเหลว: ${error.message}`);
+        }
+    }
+
+
+    // DOMContentLoaded ensures all HTML is loaded before script runs
+    document.addEventListener('DOMContentLoaded', () => {
+        // Update time immediately and then every second
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // Get all necessary elements
+        const loginButton = document.getElementById('login-button');
+        const studentIdInput = document.getElementById('student-id-input');
+        const databaseAppIcon = document.getElementById('database-app-icon');
+        const createDbButton = document.getElementById('create-db-button');
+        const cancelDbButton = document.getElementById('cancel-db-button');
+        const uploadFileOption = document.getElementById('upload-file-option');
+        const createFolderOption = document.getElementById('create-folder-option');
+        const createNewFileOption = document.getElementById('create-new-file-option');
+        const backFromCreationOptions = document.getElementById('back-from-creation-options');
+        const backFromMyDbButton = document.getElementById('back-from-my-db');
+        const addFileButton = document.getElementById('add-file-button');
+        const fileInput = document.getElementById('file-input'); // Now supports folder upload
+        const backFromFileEditorButton = document.getElementById('back-from-file-editor');
+        const saveFileButton = document.getElementById('save-file-button');
+
+        // Item Options Modal elements
+        const itemOptionsModal = document.getElementById('item-options-modal');
+        const modalOptionDelete = document.getElementById('modal-option-delete');
+        const modalOptionCopy = document.getElementById('modal-option-copy');
+        const modalOptionCut = document.getElementById('modal-option-cut');
+        const modalOptionCancel = document.getElementById('modal-option-cancel');
+
+        // Header Options Modal elements
+        const headerThreeDotsButton = document.getElementById('header-three-dots-button');
+        const headerOptionsModal = document.getElementById('header-options-modal');
+        const headerOptionPaste = document.getElementById('header-option-paste');
+        const headerOptionSearch = document.getElementById('header-option-search');
+        const headerOptionCancel = document.getElementById('header-option-cancel');
+
+        // Search Results Modal elements
+        const searchResultsModal = document.getElementById('search-results-modal');
+        const searchResultsList = document.getElementById('search-results-list');
+        const noSearchResultsMessage = document.getElementById('no-search-results-message');
+        const searchResultsOk = document.getElementById('search-results-ok');
+
+        // Side Navigation Modal elements
+        const hamburgerMenuButton = document.getElementById('hamburger-menu-button');
+        const sideNavModal = document.getElementById('side-nav-modal');
+        const sideNavDbIcon = document.getElementById('side-nav-db-icon');
+        const sideNavProfile = document.getElementById('side-nav-profile');
+        const sideNavAdd = document.getElementById('side-nav-add');
+        const sideNavApps = document.getElementById('side-nav-apps');
+        const sideNavLogout = document.getElementById('side-nav-logout');
+
+
+        // --- Event Listeners ---
+
+        // Hide any open modals/menus on general clicks outside them
+        document.addEventListener('click', (e) => {
+            // Hide item options modal
+            if (!itemOptionsModal.classList.contains('hidden') && !itemOptionsModal.contains(e.target) && !e.target.closest('.three-dots-menu-button')) {
+                hideItemOptionsModal();
+            }
+            // Hide header options modal
+            if (!headerOptionsModal.classList.contains('hidden') && !headerOptionsModal.contains(e.target) && !e.target.closest('#header-three-dots-button')) {
+                hideHeaderOptionsModal();
+            }
+            // Hide search results modal
+            if (!searchResultsModal.classList.contains('hidden') && !searchResultsModal.contains(e.target) && !e.target.closest('#search-results-modal .modal-content')) {
+                 hideSearchResultsModal();
+            }
+            // Hide side nav modal if click is outside its content and not on the hamburger button
+            if (!sideNavModal.classList.contains('hidden') && !sideNavModal.contains(e.target) && !e.target.closest('#hamburger-menu-button')) {
+                hideSideNavModal();
+            }
+        });
+
+        // Login Button Click
+        if (loginButton) {
+            loginButton.addEventListener('click', () => {
+                const studentId = studentIdInput.value.trim();
+                loginUser(studentId);
+            });
+            // Allow pressing Enter in the input field to log in
+            studentIdInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    loginButton.click();
+                }
+            });
+        }
+
+        // Handle click on Database App Icon (on home screen)
+        if (databaseAppIcon) {
+            databaseAppIcon.addEventListener('click', () => {
+                if (isDatabaseCreated) {
+                    showScreen('my-database-screen');
+                    renderFiles();
+                } else {
+                    showScreen('database-options-screen');
+                }
+            });
+        }
+
+        // Handle click on "Create Database" button
+        if (createDbButton) {
+            createDbButton.addEventListener('click', async () => {
+                isDatabaseCreated = true;
+                fileSystem = { name: "Root", type: "folder", children: [] }; // Reset to empty if user explicitly creates
+                currentFolder = fileSystem;
+                pathSegments = ["ฐานข้อมูลของฉัน"];
+                await saveFileSystem(); // Save the newly created empty database
+                showScreen('my-database-screen');
+                renderFiles();
+            });
+        }
+
+        // Handle click on "Do Not Create" button
+        if (cancelDbButton) {
+            cancelDbButton.addEventListener('click', () => {
+                showScreen('home-screen');
+            });
+        }
+
+        // Handle click on "Upload File" option (now also handles folders)
+        if (uploadFileOption) {
+            uploadFileOption.addEventListener('click', () => {
+                fileInput.click();
+            });
+        }
+
+        // Handle file/folder selection from the hidden input
+        if (fileInput) {
+            fileInput.addEventListener('change', async (event) => {
+                if (event.target.files.length > 0) {
+                    isDatabaseCreated = true; // Assume database is created if something is uploaded
+                    let filesToProcess = Array.from(event.target.files);
+                    let uploadedCount = 0;
+
+                    // Process files sequentially to ensure folder structure is built correctly
+                    // Sort files by webkitRelativePath to ensure parent folders are created before children
+                    filesToProcess.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+
+                    for (const file of filesToProcess) {
+                        await addUploadedFileOrFolderToSystem(file, fileSystem);
+                        uploadedCount++;
+                    }
+
+                    showScreen('my-database-screen');
+                    renderFiles(); // Re-render after all files are processed
+
+                    if (uploadedCount > 0) {
+                        showMessageModal('อัพโหลดสำเร็จ', `อัพโหลด ${uploadedCount} รายการแล้ว!`);
+                    } else {
+                        showMessageModal('อัพโหลด', 'ไม่มีรายการให้อัพโหลด');
+                    }
+                    event.target.value = ''; // Clear the input so same file/folder can be selected again
+                }
+            });
+        }
+
+
+        // Handle click on "Create Folder" option
+        if (createFolderOption) {
+            createFolderOption.addEventListener('click', () => {
+                showInputModal('สร้างโฟลเดอร์ใหม่', 'ชื่อโฟลเดอร์', async (folderName) => {
+                    if (folderName && folderName.trim() !== '') {
+                        const trimmedFolderName = folderName.trim();
+                        const exists = currentFolder.children.some(item => item.name === trimmedFolderName && item.type === 'folder');
+                        if (exists) {
+                            showMessageModal('ข้อผิดพลาด', `โฟลเดอร์ชื่อ '${trimmedFolderName}' มีอยู่แล้ว`);
+                            return;
+                        }
+                        currentFolder.children.push({ name: trimmedFolderName, type: "folder", children: [] });
+                        isDatabaseCreated = true;
+                        showScreen('my-database-screen');
+                        renderFiles();
+                        await saveFileSystem(); // Save changes to Firestore
+                        showMessageModal('สร้างโฟลเดอร์สำเร็จ', `'${trimmedFolderName}' ถูกสร้างแล้ว!`);
+                    } else if (folderName !== null) {
+                        showMessageModal('ข้อผิดพลาด', 'โปรดระบุชื่อโฟลเดอร์');
+                    }
+                });
+            });
+        }
+
+        // Handle click on "Create File" option
+        if (createNewFileOption) {
+            createNewFileOption.addEventListener('click', () => {
+                showInputModal('สร้างไฟล์ใหม่', 'ชื่อไฟล์', async (fileName) => {
+                    if (fileName && fileName.trim() !== '') {
+                        const trimmedFileName = fileName.trim();
+                        const exists = currentFolder.children.some(item => item.name === trimmedFileName && item.type === 'file');
+                        if (exists) {
+                            showMessageModal('ข้อผิดพลาด', `ไฟล์ชื่อ '${trimmedFileName}' มีอยู่แล้ว`);
+                            return;
+                        }
+                        currentFolder.children.push({ name: trimmedFileName, type: "file", content: "" });
+                        isDatabaseCreated = true;
+                        showScreen('my-database-screen');
+                        renderFiles();
+                        await saveFileSystem(); // Save changes to Firestore
+                        showMessageModal('สร้างไฟล์สำเร็จ', `'${trimmedFileName}' ถูกสร้างแล้ว!`);
+                    } else if (fileName !== null) {
+                        showMessageModal('ข้อผิดพลาด', 'โปรดระบุชื่อไฟล์');
+                    }
+                });
+            });
+        }
+
+        // Handle click on "Back" button from Database Creation Options screen
+        if (backFromCreationOptions) {
+            backFromCreationOptions.addEventListener('click', () => {
+                if (isDatabaseCreated) {
+                    showScreen('my-database-screen');
+                    renderFiles();
+                } else {
+                    showScreen('database-options-screen');
+                }
+            });
+        }
+
+        // Handle click on "Back" button from My Database screen
+        if (backFromMyDbButton) {
+            backFromMyDbButton.addEventListener('click', () => {
+                navigateBack();
+            });
+        }
+
+        // Handle click on Add File button (on my-database-screen)
+        if (addFileButton) {
+            addFileButton.addEventListener('click', () => {
+                showScreen('database-creation-options-screen');
+            });
+        }
+
+        // Handle click on "Back" button from File Editor screen
+        if (backFromFileEditorButton) {
+            backFromFileEditorButton.addEventListener('click', () => {
+                showScreen('my-database-screen');
+                renderFiles();
+            });
+        }
+
+        // Handle click on "Save" button in File Editor screen
+        if (saveFileButton) {
+            saveFileButton.addEventListener('click', async () => {
+                if (currentEditingFile) {
+                    currentEditingFile.content = document.getElementById('file-content-textarea').value;
+                    await saveFileSystem(); // Save changes to Firestore
+                    showMessageModal('บันทึกสำเร็จ', `'${currentEditingFile.name}' ถูกบันทึกแล้ว!`);
+                    showScreen('my-database-screen');
+                    renderFiles();
+                }
+            });
+        }
+
+        // Item Options Modal Clicks
+        if (modalOptionDelete) {
+            modalOptionDelete.addEventListener('click', deleteItem);
+        }
+        if (modalOptionCopy) {
+            modalOptionCopy.addEventListener('click', copyItem);
+        }
+        if (modalOptionCut) {
+            modalOptionCut.addEventListener('click', cutItem);
+        }
+        if (modalOptionCancel) {
+            modalOptionCancel.addEventListener('click', hideItemOptionsModal);
+        }
+
+        // Header Three Dots Button Click
+        if (headerThreeDotsButton) {
+            headerThreeDotsButton.addEventListener('click', showHeaderOptionsModal);
+        }
+
+        // Header Options Modal Clicks
+        if (headerOptionPaste) {
+            headerOptionPaste.addEventListener('click', pasteItem);
+        }
+        if (headerOptionSearch) {
+            headerOptionSearch.addEventListener('click', performSearch);
+        }
+        if (headerOptionCancel) {
+            headerOptionCancel.addEventListener('click', hideHeaderOptionsModal);
+        }
+
+        // Search Results Modal OK Button
+        if (searchResultsOk) {
+            searchResultsOk.addEventListener('click', hideSearchResultsModal);
+        }
+
+        // Hamburger Menu Button Click
+        if (hamburgerMenuButton) {
+            hamburgerMenuButton.addEventListener('click', showSideNavModal);
+        }
+
+        // Side Navigation Items Clicks
+        if (sideNavDbIcon) {
+            sideNavDbIcon.addEventListener('click', () => {
+                if (isDatabaseCreated) { // Check if a database is initialized for the current user
+                    showScreen('my-database-screen');
+                    renderFiles();
+                } else {
+                    showScreen('database-options-screen');
+                }
+                hideSideNavModal(); // Close side nav after navigating
+            });
+        }
+        if (sideNavProfile) {
+            sideNavProfile.addEventListener('click', () => {
+                showMessageModal('ฟังก์ชันยังไม่พร้อม', `ฟังก์ชัน 'โปรไฟล์' ยังไม่พร้อมใช้งาน`);
+                hideSideNavModal();
+            });
+        }
+        if (sideNavAdd) {
+            sideNavAdd.addEventListener('click', () => {
+                showMessageModal('ฟังก์ชันยังไม่พร้อม', `ฟังก์ชัน 'เพิ่ม' ยังไม่พร้อมใช้งาน`);
+                hideSideNavModal();
+            });
+        }
+        if (sideNavApps) {
+            sideNavApps.addEventListener('click', () => {
+                showMessageModal('ฟังก์ชันยังไม่พร้อม', `ฟังก์ชัน 'แอป' ยังไม่พร้อมใช้งาน`);
+                hideSideNavModal();
+            });
+        }
+        if (sideNavLogout) {
+            sideNavLogout.addEventListener('click', logoutUser);
+        }
+
+
+        // Initial update of paste button visibility
+        updatePasteButtonVisibility();
+
+        // Initially show the login screen
+        showScreen('login-screen');
+    });
+</script>
+</html>
